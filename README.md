@@ -1,32 +1,42 @@
-# runcmd
+# go-runcmd
 
-runcmd is a common interface for running local and remote commands and provides
-the `Runner` interface which helps to abstract away running local and remote
-shell commands.
+`go-runcmd` is a Go library and common interface for running local and remote commands providing the Runner interface which helps to abstract away running local and remote shell commands
 
-> Borrowed from https://github.com/kovetskiy/runcmd-
+> Borrowed from [kovetskiy/runcmd-](https://github.com/kovetskiy/runcmd-)
 
 ## Install
 
 ```#!console
-go get gitlab.mgt.aom.australiacloud.com.au/aom/golib/runcmd
+go get github.com/aucloud/go-runcmd
 ```
 
 ## Usage
 
-First, create runner: this is a type, that holds:
-
-- for local commands: empty struct
-- for remote commands: connect to remote host;
-  so, you can create only one remote runner to remote host
+First, import the library:
 
 ```#!go
-lRunner, err := runcmd.NewLocalRunner()
+import "github.com/aucloud/go-runcmd"
+```
+
+Next, create a runner: this is a type, that holds:
+
+- for local commands: empty struct
+- for remote commands: connecttion to a remote host;
+  so, you can create only one remote runner to remote host
+
+Local Runner:
+
+```#!go
+uunner, err := runcmd.NewLocalRunner()
 if err != nil {
   //handle error
 }
+```
 
-rRunner, err := runcmd.NewRemoteKeyAuthRunner(
+Remote Runner:
+
+```#!go
+runner, err := runcmd.NewRemoteKeyAuthRunner(
   "user",
   "127.0.0.1:22",
   "/home/user/id_rsa",
@@ -36,10 +46,10 @@ if err != nil {
 }
 ```
 
-After that, create command, and run methods:
+After that, create a command, and call `.Run()`:
 
 ```#!go
-c, err := rRunner.Command("date")
+c, err := runner.Command("date")
 if err != nil {
   //handle error
 }
@@ -65,16 +75,6 @@ func listSomeDir(r Runner) error {
   for _, i := range out {
     fmt.Println(i)
   }
-}
-
-// List some dir on local host:
-if err := listSomeDir(lRunner); err != nil {
-  //handle error
-}
-
-// List some dir on remote host:
-if err := listSomeDir(rRunner); err != nil {
-  //handle error
 }
 ```
 
@@ -114,3 +114,7 @@ cmdLocal.Wait()
 cmdRemote.StdinPipe().Close()
 cmdRemote.Wait()
 ```
+
+## License
+
+`go-runcmd` is licensed under the terms of the [AGPLv3](/LICENSE)
