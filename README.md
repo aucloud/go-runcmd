@@ -1,5 +1,7 @@
 # go-runcmd
 
+[![Go](https://github.com/aucloud/go-runcmd/actions/workflows/go.yml/badge.svg)](https://github.com/aucloud/go-runcmd/actions/workflows/go.yml)
+
 `go-runcmd` is a Go library and common interface for running local and remote commands providing the Runner interface which helps to abstract away running local and remote shell commands
 
 > Borrowed from [kovetskiy/runcmd-](https://github.com/kovetskiy/runcmd-)
