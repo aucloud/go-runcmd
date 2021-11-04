@@ -29,7 +29,7 @@ Next, create a runner: this is a type, that holds:
 Local Runner:
 
 ```#!go
-uunner, err := runcmd.NewLocalRunner()
+runner, err := runcmd.NewLocalRunner()
 if err != nil {
   //handle error
 }
