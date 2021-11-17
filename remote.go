@@ -23,6 +23,7 @@ package runcmd
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -41,15 +42,15 @@ type Remote struct {
 
 func NewRemoteKeyAuthRunner(user, host, key string) (*Remote, error) {
 	if _, err := os.Stat(key); os.IsNotExist(err) {
-		return nil, err
+		return nil, fmt.Errorf("error reading private ssh key %s: %w", key, err)
 	}
 	pemBytes, err := ioutil.ReadFile(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading private ssh key %s: %w", key, err)
 	}
 	signer, err := ssh.ParsePrivateKey(pemBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error parsing private ssh key %s: %w", key, err)
 	}
 	config := &ssh.ClientConfig{
 		User: user,
