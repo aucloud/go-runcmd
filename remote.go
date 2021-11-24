@@ -57,10 +57,10 @@ func ResolveHostname(hostport string) (net.Addr, error) {
 			return nil, fmt.Errorf("error parsing hostport %s, expected 2 tokens got %d", hostport, len(tokens))
 		}
 		host = tokens[0]
+		port = tokens[1]
 		if _, err := strconv.Atoi(port); err != nil {
 			return nil, fmt.Errorf("error parsing hostport %s, expected <host>:<port> and <port> to be an int: %w", hostport, err)
 		}
-		port = tokens[1]
 	} else {
 		host = hostport
 		port = "22"
