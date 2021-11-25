@@ -22,12 +22,17 @@
 package runcmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
+	"strconv"
+	"strings"
 
+	sshutil "github.com/aucloud/go-sshutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -37,10 +42,38 @@ type RemoteCmd struct {
 }
 
 type Remote struct {
-	serverConn *ssh.Client
+	client *sshutil.Client
 }
 
-func NewRemoteKeyAuthRunner(user, host, key string) (*Remote, error) {
+func ResolveHostname(hostport string) (net.Addr, error) {
+	var (
+		host string
+		port string
+	)
+
+	if strings.Contains(hostport, ":") {
+		tokens := strings.SplitN(hostport, ":", 2)
+		if len(tokens) != 2 {
+			return nil, fmt.Errorf("error parsing hostport %s, expected 2 tokens got %d", hostport, len(tokens))
+		}
+		host = tokens[0]
+		port = tokens[1]
+		if _, err := strconv.Atoi(port); err != nil {
+			return nil, fmt.Errorf("error parsing hostport %s, expected <host>:<port> and <port> to be an int: %w", hostport, err)
+		}
+	} else {
+		host = hostport
+		port = "22"
+	}
+
+	addr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(host, port))
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func NewRemoteKeyAuthRunner(ctx context.Context, user, host, key string) (*Remote, error) {
 	if _, err := os.Stat(key); os.IsNotExist(err) {
 		return nil, fmt.Errorf("error reading private ssh key %s: %w", key, err)
 	}
@@ -58,23 +91,38 @@ func NewRemoteKeyAuthRunner(user, host, key string) (*Remote, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 	}
-	server, err := ssh.Dial("tcp", host, config)
+	addr, err := ResolveHostname(host)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve hostname %s: %w", host, err)
 	}
-	return &Remote{server}, nil
+	client, err := sshutil.NewClient(
+		ctx,
+		sshutil.ConstantAddrResolver{addr},
+		config,
+		sshutil.DefaultConnectBackoff(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish an SSH connection to %s: %w", host, err)
+	}
+	return &Remote{client}, nil
 }
 
-func NewRemotePassAuthRunner(user, host, password string) (*Remote, error) {
+func NewRemotePassAuthRunner(ctx context.Context, user, host, password string) (*Remote, error) {
 	config := &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{ssh.Password(password)},
 	}
-	server, err := ssh.Dial("tcp", host, config)
+	addr, err := ResolveHostname(host)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve hostname %s: %w", host, err)
 	}
-	return &Remote{server}, nil
+	client, err := sshutil.NewClient(
+		ctx,
+		sshutil.ConstantAddrResolver{addr},
+		config,
+		sshutil.DefaultConnectBackoff(),
+	)
+	return &Remote{client}, nil
 }
 
 func (runner *Remote) Command(cmdline string) (CmdWorker, error) {
@@ -82,7 +130,7 @@ func (runner *Remote) Command(cmdline string) (CmdWorker, error) {
 		return nil, errors.New("command cannot be empty")
 	}
 
-	session, err := runner.serverConn.NewSession()
+	session, err := runner.client.Client().NewSession()
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +142,8 @@ func (runner *Remote) Command(cmdline string) (CmdWorker, error) {
 }
 
 func (runner *Remote) CloseConnection() error {
-	return runner.serverConn.Close()
+	runner.client.Close()
+	return nil
 }
 
 func (cmd *RemoteCmd) Run() ([]string, error) {
