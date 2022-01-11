@@ -107,6 +107,58 @@ func NewRemoteKeyAuthRunner(ctx context.Context, user, host, key string) (*Remot
 	return &Remote{client}, nil
 }
 
+func NewRemoteKeyAuthRunnerViaJumphost(ctx context.Context, user, host, jumphost, key string) (*Remote, error) {
+	if _, err := os.Stat(key); os.IsNotExist(err) {
+		return nil, fmt.Errorf("error reading private ssh key %s: %w", key, err)
+	}
+	pemBytes, err := ioutil.ReadFile(key)
+	if err != nil {
+		return nil, fmt.Errorf("error reading private ssh key %s: %w", key, err)
+	}
+	signer, err := ssh.ParsePrivateKey(pemBytes)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing private ssh key %s: %w", key, err)
+	}
+	config := &ssh.ClientConfig{
+		User: user,
+		// FIXME: This is insecure. We should verify RSA fingerprints of hosts...
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+	}
+
+	// First connect to the Jumphost
+	jumphostAddr, err := ResolveHostname(jumphost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve hostname %s: %w", jumphost, err)
+	}
+	bastionClient, err := sshutil.NewClient(
+		ctx,
+		sshutil.ConstantAddrResolver{jumphostAddr},
+		config,
+		sshutil.DefaultConnectBackoff(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish an SSH connection to %s: %w", host, err)
+	}
+
+	// Next connect to the target host
+	addr, err := ResolveHostname(host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve hostname %s: %w", jumphost, err)
+	}
+	client, err := bastionClient.ConnectTo(
+		ctx,
+		sshutil.ConstantAddrResolver{addr},
+		config,
+		sshutil.DefaultConnectBackoff(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish an SSH connection to %s: %w", host, err)
+	}
+
+	return &Remote{client}, nil
+}
+
 func NewRemotePassAuthRunner(ctx context.Context, user, host, password string) (*Remote, error) {
 	config := &ssh.ClientConfig{
 		User: user,
