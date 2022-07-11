@@ -41,7 +41,19 @@ var (
 
 /* FIXME: Mock an SSH server
 func TestKeyAuth(t *testing.T) {
-	rRunner, err := NewRemoteKeyAuthRunner(user, host, key)
+	rRunner, err := NewRemoteKeyAuthRunner(context.TODO(), user, host, key)
+	if err != nil {
+		t.Error(err)
+	}
+	if err := testRun(rRunner); err != nil {
+		t.Error(err)
+	}
+}
+*/
+
+/* FIXME: Mock an SSH server
+func TestKeyAuth(t *testing.T) {
+	rRunner, err := NewRemoteAgentAuthRunner(context.TODO(), os.Getenv("USER"), "localhost", os.Getenv("SSH_AUTH_SOCK"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -58,7 +70,7 @@ func TestPassAuth(t *testing.T) {
 			os.Exit(1)
 		}
 	}()
-	rRunner, err := NewRemotePassAuthRunner(user, host, pass)
+	rRunner, err := NewRemotePassAuthRunner(context.TODO(), user, host, pass)
 	if err != nil {
 		t.Error(err)
 	}
@@ -80,7 +92,7 @@ func TestLocalRun(t *testing.T) {
 
 /* FIXME: Mock anSSH server
 func TestRemoteRun(t *testing.T) {
-	rRunner, err := NewRemoteKeyAuthRunner(user, host, key)
+	rRunner, err := NewRemoteKeyAuthRunner(context.TODO(), user, host, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -102,7 +114,7 @@ func TestLocalStartWait(t *testing.T) {
 
 /* FIXME: Mock an SSH server
 func TestRemoteStartWait(t *testing.T) {
-	rRunner, err := NewRemoteKeyAuthRunner(user, host, key)
+	rRunner, err := NewRemoteKeyAuthRunner(context.TODO(), user, host, key)
 	if err != nil {
 		t.Error(err)
 	}
@@ -242,7 +254,7 @@ func testPipe(localToRemote bool) error {
 	if err != nil {
 		return err
 	}
-	rRunner, err := NewRemoteKeyAuthRunner(user, host, key)
+	rRunner, err := NewRemoteKeyAuthRunner(context.TODO(), user, host, key)
 	if err != nil {
 		return err
 	}
