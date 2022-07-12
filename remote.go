@@ -34,6 +34,7 @@ import (
 
 	sshutil "github.com/aucloud/go-sshutil"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 )
 
 type RemoteCmd struct {
@@ -90,6 +91,38 @@ func NewRemoteKeyAuthRunner(ctx context.Context, user, host, key string) (*Remot
 		// FIXME: This is insecure. We should verify RSA fingerprints of hosts...
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
+	}
+	addr, err := ResolveHostname(host)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve hostname %s: %w", host, err)
+	}
+	client, err := sshutil.NewClient(
+		ctx,
+		sshutil.ConstantAddrResolver{addr},
+		config,
+		sshutil.DefaultConnectBackoff(),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to establish an SSH connection to %s: %w", host, err)
+	}
+	return &Remote{client}, nil
+}
+
+func NewRemoteAgentAuthRunner(ctx context.Context, user, host, agentSocket string) (*Remote, error) {
+
+	if _, err := os.Stat(agentSocket); os.IsNotExist(err) {
+		return nil, fmt.Errorf("agent socket %s does not exist: %w", agentSocket, err)
+	}
+	agentConn, err := net.Dial("unix", agentSocket)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open SSH agent socket %s: %v", agentSocket, err)
+	}
+	agentClient := agent.NewClient(agentConn)
+	config := &ssh.ClientConfig{
+		User: user,
+		// FIXME: This is insecure. We should verify RSA fingerprints of hosts...
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Auth:            []ssh.AuthMethod{ssh.PublicKeysCallback(agentClient.Signers)},
 	}
 	addr, err := ResolveHostname(host)
 	if err != nil {
